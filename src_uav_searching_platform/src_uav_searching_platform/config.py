@@ -62,3 +62,6 @@ MAX_FRAMES = 5000          # 最大允许运行帧数
 MAX_DISTANCE = 20000.0    # 最大允许飞行距离（可选）
 STOP_WHEN_ALL_FOUND = True
 
+##复现性
+DEFAULT_SEED = 201  # 用于 demo/main 的固定随机种子
+

@@ -4,12 +4,15 @@ import random
 
 from ..simulator import Simulator
 from datetime import datetime
+from ..utils.seed import set_seed
+
 # 终端运行python -m src_uav_searching_platform.evaluation.experiment_runner
 # 在E:\Graduation project\src_uav_searching_platform>下运
 
 
 RESULT_DIR = "results"
 RESULT_FILE = os.path.join(RESULT_DIR, f"results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
+
 
 
 def run_experiments(num_runs=10, base_seed=0):
@@ -21,7 +24,8 @@ def run_experiments(num_runs=10, base_seed=0):
 
         for i in range(num_runs):
             seed = base_seed + i
-            random.seed(seed)
+            set_seed(seed)
+
 
             sim = Simulator(render=False, mode="experiment")
             sim.run()
@@ -39,4 +43,4 @@ def run_experiments(num_runs=10, base_seed=0):
 
 
 if __name__ == "__main__":
-    run_experiments(num_runs=30, base_seed=100)
+    run_experiments(num_runs=30, base_seed=200)
