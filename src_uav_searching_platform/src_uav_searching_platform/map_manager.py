@@ -2,7 +2,8 @@
 Map Manager - handles map loading and rendering
 """
 import pygame
-import config
+from . import config
+
 
 
 class MapManager:

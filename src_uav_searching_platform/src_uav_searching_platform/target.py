@@ -3,7 +3,8 @@ Target class - represents the search target
 """
 import pygame
 import math
-import config
+from . import config
+
 
 
 class Target:

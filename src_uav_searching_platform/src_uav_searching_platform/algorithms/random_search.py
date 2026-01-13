@@ -4,7 +4,7 @@ Random Search Algorithm - baseline algorithm
 import random
 import math
 from .base_algorithm import BaseAlgorithm
-import config
+from .. import config
 
 
 class RandomSearch(BaseAlgorithm):

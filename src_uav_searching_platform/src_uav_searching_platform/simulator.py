@@ -2,11 +2,12 @@
 Simulator - main simulation engine
 """
 import pygame
-import config
-from map_manager import MapManager
-from uav import UAV
-from target import Target
-from algorithms import RandomSearch
+from . import config
+from .map_manager import MapManager
+from .uav import UAV
+from .target import Target
+from .algorithms import RandomSearch
+
 
 
 class Simulator:
@@ -219,7 +220,7 @@ class Simulator:
         self.algorithm = algorithm
         self.reset()
 
-    #停止条件
+    # 停止条件
     def check_termination(self):
         if self.target_found:
             return True, "success"
@@ -231,3 +232,4 @@ class Simulator:
             return True, "distance_limit"
 
         return False, None
+

@@ -1,6 +1,9 @@
 """
 Configuration file for UAV Search Simulator
 """
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Window settings
 WINDOW_WIDTH = 1200
@@ -31,9 +34,10 @@ TARGET_X = 600  # target position x (can be random)
 TARGET_Y = 400  # target position y (can be random)
 
 # Map settings
-MAP_IMAGE_PATH = "img/map_1.png"
-UAV_IMAGE_PATH = "img/uav.png"
-TARGET_IMAGE_PATH = "img/target.png"
+MAP_IMAGE_PATH = os.path.join(BASE_DIR, "img", "map_1.png")
+UAV_IMAGE_PATH = os.path.join(BASE_DIR, "img", "uav.png")
+TARGET_IMAGE_PATH = os.path.join(BASE_DIR, "img", "target.png")
+
 
 # Algorithm settings
 RANDOM_SEARCH_TURN_PROBABILITY = 0.05  # probability to change direction

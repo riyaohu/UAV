@@ -3,7 +3,8 @@ UAV class - represents the unmanned aerial vehicle
 """
 import pygame
 import math
-import config
+from . import config
+
 
 
 class UAV:

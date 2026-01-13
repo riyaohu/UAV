@@ -149,3 +149,8 @@ class MyNewAlgorithm(BaseAlgorithm):
 ## 许可证
 
 MIT License
+
+## 版本功能
+- **main.py中render=False/True决定是否有运行界面 ,mode="experiment/demo决定结束条件（自动/人为关闭）**
+- **experiment_runner运行实现多次仿真**
+- 
