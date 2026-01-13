@@ -7,7 +7,7 @@ from simulator import Simulator
 def main():
     """Main function"""
     # Create and run simulator
-    simulator = Simulator()
+    simulator = Simulator(render=False ,mode="experiment")
     simulator.run()
 
 

@@ -12,18 +12,23 @@ from algorithms import RandomSearch
 class Simulator:
     """Main simulator class that manages the simulation"""
 
-    def __init__(self):
+    def __init__(self,render=True, mode="experiment"):
         """Initialize the simulator"""
         # Initialize pygame
-        pygame.init()
+        self.render = render
+        self.mode = mode
+        self.stop_reason = None
+        if self.render:
+            pygame.init()
 
-        # Create window
-        self.screen = pygame.display.set_mode((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
-        pygame.display.set_caption(config.WINDOW_TITLE)
-        self.clock = pygame.time.Clock()
+            # Create window
+            self.screen = pygame.display.set_mode((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
+            pygame.display.set_caption(config.WINDOW_TITLE)
+            self.clock = pygame.time.Clock()
 
-        # Initialize font
-        self.font = pygame.font.Font(None, config.INFO_FONT_SIZE)
+            # Initialize font
+            self.font = pygame.font.Font(None, config.INFO_FONT_SIZE)
+
 
         # Create game objects
         self.map_manager = MapManager()
@@ -79,6 +84,14 @@ class Simulator:
             print(f"Target found! Time: {self.frames} frames, Distance: {self.uav.distance_traveled:.2f} pixels")
 
         self.frames += 1
+
+        stop, reason = self.check_termination()
+        if stop:
+            self.stop_reason = reason
+            if self.mode == "experiment":
+                self.running = False
+            elif self.mode == "demo":
+                self.paused = True  # 停下来但不退出
 
     def draw(self):
         """Draw all elements on screen"""
@@ -156,8 +169,10 @@ class Simulator:
         self.target.reset()
         self.algorithm.reset()
         self.paused = False
+        self.running = True
         self.target_found = False
         self.search_complete = False
+        self.stop_reason = None
         self.frames = 0
         print("Simulation reset")
 
@@ -172,21 +187,26 @@ class Simulator:
         print("  R - Reset")
         print("  ESC - Quit")
 
+
         while self.running:
             # Handle events
-            self.handle_events()
+            if self.render:
+                self.handle_events()
 
             # Update simulation
             self.update()
 
             # Draw everything
-            self.draw()
-
+            if self.render:
+                self.draw()
             # Control frame rate
-            self.clock.tick(config.FPS)
+                self.clock.tick(config.FPS)
 
         # Cleanup
-        pygame.quit()
+        if self.render:
+            pygame.quit()
+        print(f"Stop reason: {self.stop_reason}")
+        print(f"Frames: {self.frames}")
         print("Simulator closed")
 
     def set_algorithm(self, algorithm):
@@ -198,3 +218,16 @@ class Simulator:
         """
         self.algorithm = algorithm
         self.reset()
+
+    #停止条件
+    def check_termination(self):
+        if self.target_found:
+            return True, "success"
+
+        if self.frames >= config.MAX_FRAMES:
+            return True, "timeout"
+
+        if self.uav.distance_traveled >= config.MAX_DISTANCE:
+            return True, "distance_limit"
+
+        return False, None
