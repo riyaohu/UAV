@@ -34,7 +34,10 @@ class Simulator:
         # Create game objects
         self.map_manager = MapManager()
         self.uav = UAV(config.UAV_START_X, config.UAV_START_Y)
-        self.target = Target(config.TARGET_X, config.TARGET_Y)
+        self.targets = []
+        for i in range(config.NUM_TARGETS):
+            x, y = config.TARGET_POSITIONS[i]
+            self.targets.append(Target(x, y))
 
         # Initialize algorithm
         map_width, map_height = self.map_manager.get_size()
@@ -77,12 +80,18 @@ class Simulator:
         self.uav.set_position(next_x, next_y)
 
         # Check if target is detected
-        if self.target.is_detected(
-            self.uav.x, self.uav.y, self.uav.detection_radius
-        ):
-            self.target_found = True
-            self.search_complete = True
-            print(f"Target found! Time: {self.frames} frames, Distance: {self.uav.distance_traveled:.2f} pixels")
+        # 逐个检测目标
+        for t in self.targets:
+            if t.is_detected(self.uav.x, self.uav.y, self.uav.detection_radius):
+                print(f"Found one target at ({t.x}, {t.y})! Now: {self.get_found_count()}/{len(self.targets)}")
+
+        # 是否全部找到
+        if config.STOP_WHEN_ALL_FOUND:
+            if self.get_found_count() == len(self.targets):
+                self.target_found = True  # 你可以继续沿用这个变量名：含义改成“全部找到”
+                self.search_complete = True
+                print(
+                    f"All targets found! Time: {self.frames} frames, Distance: {self.uav.distance_traveled:.2f} pixels")
 
         self.frames += 1
 
@@ -94,13 +103,17 @@ class Simulator:
             elif self.mode == "demo":
                 self.paused = True  # 停下来但不退出
 
+    def get_found_count(self):
+        return sum(1 for t in self.targets if t.found)
+
     def draw(self):
         """Draw all elements on screen"""
         # Draw map background
         self.map_manager.draw(self.screen)
 
         # Draw target (only if not found, or with highlight if found)
-        self.target.draw(self.screen)
+        for t in self.targets:
+            t.draw(self.screen)
 
         # Draw UAV with detection range and trajectory
         self.uav.draw(
@@ -117,12 +130,14 @@ class Simulator:
 
     def draw_info_panel(self):
         """Draw information panel with statistics"""
+        found_count = self.get_found_count()
         info_lines = [
             f"Algorithm: {self.algorithm.get_name()}",
             f"Time: {self.frames} frames ({self.frames / config.FPS:.1f}s)",
             f"Distance: {self.uav.distance_traveled:.1f} px",
             f"Position: ({int(self.uav.x)}, {int(self.uav.y)})",
-            f"Status: {'FOUND!' if self.target_found else 'Searching...'}"
+            f"Found: {found_count}/{len(self.targets)}",
+            f"Status: {'ALL FOUND!' if self.target_found else 'Searching...'}"
         ]
 
         if self.paused:
@@ -167,7 +182,8 @@ class Simulator:
     def reset(self):
         """Reset simulation to initial state"""
         self.uav.reset()
-        self.target.reset()
+        for t in self.targets:
+            t.reset()
         self.algorithm.reset()
         self.paused = False
         self.running = True
@@ -181,7 +197,7 @@ class Simulator:
         """Main simulation loop"""
         print(f"Starting UAV Search Simulator")
         print(f"Algorithm: {self.algorithm.get_name()}")
-        print(f"Target location: ({self.target.x}, {self.target.y})")
+        print(f"Targets: {[ (t.x, t.y) for t in self.targets ]}")
         print(f"Detection radius: {self.uav.detection_radius} pixels")
         print("\nControls:")
         print("  SPACE - Pause/Resume")
