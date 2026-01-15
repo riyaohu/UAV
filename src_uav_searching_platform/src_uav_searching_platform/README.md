@@ -153,4 +153,4 @@ MIT License
 ## 版本功能
 - **main.py中render=False/True决定是否有运行界面 ,mode="experiment/demo决定结束条件（自动/人为关闭）**
 - **experiment_runner运行实现多次仿真**
-- 
+- ***main.py中use_grid_map决定是否有障碍物，experiment_runner同**

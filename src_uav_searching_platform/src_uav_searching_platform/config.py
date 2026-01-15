@@ -19,6 +19,10 @@ COLOR_GREEN = (0, 255, 0)
 COLOR_BLUE = (0, 0, 255)
 COLOR_YELLOW = (255, 255, 0)
 COLOR_GRAY = (128, 128, 128)
+COLOR_ORANGE = (255, 165, 0)
+COLOR_BROWN = (165, 42, 42)
+COLOR_PINK = (255, 192, 203)
+COLOR_DARK_GRAY = (64, 64, 64)
 COLOR_DETECTION_RANGE = (0, 255, 0, 50)  # Green with transparency
 
 # UAV settings
@@ -63,7 +67,7 @@ MAX_DISTANCE = 20000.0    # 最大允许飞行距离（可选）
 STOP_WHEN_ALL_FOUND = True
 
 # 复现性
-DEFAULT_SEED = 201  # 用于 demo/main 的固定随机种子
+DEFAULT_SEED = 202  # 用于 demo/main 的固定随机种子
 
 # 多目标
 # 多目标配置（第5步）
@@ -77,5 +81,14 @@ TARGET_POSITIONS = [
 ]
 # targets位置随机或是固定（第五步定义，但还未实现）
 TARGET_MODE = "fixed"   # "fixed" 或 "random"
+
+# 第6步：栅格地图配置
+USE_GRID_MAP = True
+
+MAP_WIDTH = 1000
+MAP_HEIGHT = 800
+CELL_SIZE = 20
+OBSTACLE_DENSITY = 0.05
+BORDER_BLOCKED = False
 
 

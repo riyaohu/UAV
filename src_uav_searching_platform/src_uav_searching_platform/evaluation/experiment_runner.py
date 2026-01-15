@@ -1,7 +1,7 @@
 import csv
 import os
 import random
-
+from .. import config
 from ..simulator import Simulator
 from datetime import datetime
 from ..utils.seed import set_seed
@@ -15,13 +15,13 @@ RESULT_FILE = os.path.join(RESULT_DIR, f"results_{datetime.now().strftime('%Y%m%
 
 
 
-def run_experiments(num_runs=10, base_seed=0):
+def run_experiments(num_runs=10, base_seed=0, use_grid_map=None):
     os.makedirs(RESULT_DIR, exist_ok=True)
 
     with open(RESULT_FILE, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(
-            ["run_id", "found_all", "found_count", "total_targets", "discovery_rate", "frames", "distance", "seed",
+            ["run_id", "found_all", "found_count", "total_targets", "discovery_rate", "frames", "distance", "use_grid_map","map_width", "map_height", "cell_size", "obstacle_density", "seed",
              "stop_reason"])
 
         successes = 0
@@ -31,12 +31,18 @@ def run_experiments(num_runs=10, base_seed=0):
             seed = base_seed + i
             set_seed(seed)
 
-
-            sim = Simulator(render=False, mode="experiment")
+            sim = Simulator(render=False, mode="experiment", use_grid_map=use_grid_map)
             sim.run()
 
             if sim.target_found:
                 successes += 1
+            use_grid = int(sim.use_grid_map)
+
+            map_w = getattr(sim, "map_width", None)
+            map_h = getattr(sim, "map_height", None)
+
+            cell_size = getattr(sim.grid_map, "cell_size", None) if sim.grid_map is not None else None
+            obstacle_density = getattr(config, "OBSTACLE_DENSITY", None) if sim.grid_map is not None else 0.0
 
             found_count = sim.get_found_count()
             total_targets = len(sim.targets)
@@ -52,6 +58,8 @@ def run_experiments(num_runs=10, base_seed=0):
                 round(discovery_rate, 4),
                 sim.frames,
                 round(sim.uav.distance_traveled, 2),
+                int(sim.use_grid_map),
+                map_w, map_h, cell_size, obstacle_density,
                 seed,
                 sim.stop_reason
             ])
@@ -62,5 +70,8 @@ def run_experiments(num_runs=10, base_seed=0):
         writer.writerow([])
         writer.writerow(["SUMMARY", "success_rate", successes / num_runs, "avg_discovery_rate",
                          round(sum_discovery_rate / num_runs, 4)])
+
+
+
 if __name__ == "__main__":
-    run_experiments(num_runs=30, base_seed=200)
+    run_experiments(num_runs=30, base_seed=200,use_grid_map=True)

@@ -1,20 +1,30 @@
 """
 Simulator - main simulation engine
 """
+# TODO (evaluation): UAV start position policy (fixed vs random_free)
+# Will be unified later for fair comparison across algorithms
+
 import pygame
 from . import config
 from .map_manager import MapManager
 from .uav import UAV
 from .target import Target
 from .algorithms import RandomSearch
+from .environment.grid_map import GridMap
 
 
 
 class Simulator:
     """Main simulator class that manages the simulation"""
 
-    def __init__(self,render=True, mode="experiment"):
+    def __init__(self,render=True, mode="experiment", use_grid_map=None):
         """Initialize the simulator"""
+        # use_grid_map 参数优先；如果没传（None），才使用 config 默认值
+        if use_grid_map is None:
+            self.use_grid_map = getattr(config, "USE_GRID_MAP", False)
+        else:
+            self.use_grid_map = use_grid_map
+
         # Initialize pygame
         self.render = render
         self.mode = mode
@@ -23,25 +33,60 @@ class Simulator:
             pygame.init()
 
             # Create window
-            self.screen = pygame.display.set_mode((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
+            w = config.WINDOW_WIDTH
+            h = config.WINDOW_HEIGHT
+            if self.use_grid_map:
+                w = config.MAP_WIDTH
+                h = config.MAP_HEIGHT
+            self.screen = pygame.display.set_mode((w, h))
+
             pygame.display.set_caption(config.WINDOW_TITLE)
             self.clock = pygame.time.Clock()
 
             # Initialize font
             self.font = pygame.font.Font(None, config.INFO_FONT_SIZE)
 
+        # ========== Map source selection (GridMap vs Image Map) ==========
+        self.grid_map = None
+        self.map_manager = None
 
-        # Create game objects
-        self.map_manager = MapManager()
-        self.uav = UAV(config.UAV_START_X, config.UAV_START_Y)
+        if self.use_grid_map:
+            # 1) 使用参数化栅格地图
+            self.map_width = config.MAP_WIDTH
+            self.map_height = config.MAP_HEIGHT
+
+            self.grid_map = GridMap(
+                width_px=self.map_width,
+                height_px=self.map_height,
+                cell_size=config.CELL_SIZE,
+                obstacle_density=config.OBSTACLE_DENSITY,
+                border_blocked=getattr(config, "BORDER_BLOCKED", False),
+            )
+        else:
+            # 2) 使用图片地图（旧方式）
+            self.map_manager = MapManager()
+            self.map_width, self.map_height = self.map_manager.get_size()
+
+        # --- B1: 保留图片背景用于渲染（只在 render=True 时加载）---
+        if self.render and self.map_manager is None:
+            self.map_manager = MapManager()
+
+        # ========== Create UAV ==========
+        # UAV 初始点：如果是栅格地图，尽量落在free cell上（避免一开始就在障碍里）
+        if self.grid_map is not None:
+            start_x, start_y = self.grid_map.random_free_position()
+            self.uav = UAV(start_x, start_y)
+        else:
+            self.uav = UAV(config.UAV_START_X, config.UAV_START_Y)
+
+        # ========== Create targets ==========
         self.targets = []
         for i in range(config.NUM_TARGETS):
             x, y = config.TARGET_POSITIONS[i]
             self.targets.append(Target(x, y))
 
-        # Initialize algorithm
-        map_width, map_height = self.map_manager.get_size()
-        self.algorithm = RandomSearch(map_width, map_height)
+        # ========== Initialize algorithm ==========
+        self.algorithm = RandomSearch(self.map_width, self.map_height)
 
         # Simulation state
         self.running = True
@@ -76,7 +121,13 @@ class Simulator:
             current_x, current_y, self.uav.angle
         )
 
-        # Update UAV position
+        # Update UAV position with obstacle check
+        if self.grid_map is not None and self.grid_map.is_blocked_px(next_x, next_y):
+            # 撞到障碍：最简单处理——原地不动
+            # （为了避免一直卡住，可以让随机搜索重置一下方向）
+            self.algorithm.reset()
+            next_x, next_y = self.uav.get_position()
+
         self.uav.set_position(next_x, next_y)
 
         # Check if target is detected
@@ -108,8 +159,25 @@ class Simulator:
 
     def draw(self):
         """Draw all elements on screen"""
-        # Draw map background
-        self.map_manager.draw(self.screen)
+        # Draw background: image map if available, else white
+        if self.map_manager is not None:
+            self.map_manager.draw(self.screen)
+        else:
+            self.screen.fill(config.COLOR_WHITE)
+
+        if self.grid_map is not None:
+            # 新模式：绘制障碍格
+            for r in range(self.grid_map.rows):
+                for c in range(self.grid_map.cols):
+                    if self.grid_map.grid[r][c] == 1:
+                        rect = pygame.Rect(
+                            c * self.grid_map.cell_size,
+                            r * self.grid_map.cell_size,
+                            self.grid_map.cell_size,
+                            self.grid_map.cell_size
+                        )
+                        pygame.draw.rect(self.screen, config.COLOR_DARK_GRAY, rect)
+                        pygame.draw.rect(self.screen, config.COLOR_BLACK, rect, width=1)
 
         # Draw target (only if not found, or with highlight if found)
         for t in self.targets:
@@ -168,7 +236,10 @@ class Simulator:
             "ESC - Quit"
         ]
 
-        help_y = config.WINDOW_HEIGHT - len(help_lines) * line_height - 20
+        # help_y = config.WINDOW_HEIGHT - len(help_lines) * line_height - 20
+        screen_h = self.screen.get_height()
+        help_y = screen_h - len(help_lines) * line_height - 20
+
         help_surface = pygame.Surface((panel_width, len(help_lines) * line_height + 20), pygame.SRCALPHA)
         help_surface.fill(config.INFO_BG_COLOR)
         self.screen.blit(help_surface, (config.INFO_PANEL_X, help_y))
