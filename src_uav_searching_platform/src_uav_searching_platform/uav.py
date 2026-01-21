@@ -10,7 +10,7 @@ from . import config
 class UAV:
     """Represents an unmanned aerial vehicle (UAV)"""
 
-    def __init__(self, x, y, image_path=None):
+    def __init__(self, x, y, image_path=None, height=1.0):
         """
         Initialize the UAV
 
@@ -23,6 +23,7 @@ class UAV:
         self.start_y = y
         self.x = x
         self.y = y
+        self.height = height  # 新增高度参数
         self.speed = config.UAV_SPEED
         self.detection_radius = config.UAV_DETECTION_RADIUS
         self.angle = 0  # heading angle in degrees (0 = right, 90 = down)

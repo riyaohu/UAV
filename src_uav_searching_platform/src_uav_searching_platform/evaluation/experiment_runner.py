@@ -21,7 +21,7 @@ def run_experiments(num_runs=10, base_seed=0, use_grid_map=None):
     with open(RESULT_FILE, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(
-            ["run_id", "found_all", "found_count", "total_targets", "discovery_rate", "frames", "distance", "use_grid_map","map_width", "map_height", "cell_size", "obstacle_density", "seed",
+            ["run_id", "found_all", "found_count", "total_targets", "discovery_rate", "num_false_negatives","frames", "distance", "use_grid_map","map_width", "map_height", "cell_size", "obstacle_density", "seed",
              "stop_reason"])
 
         successes = 0
@@ -56,6 +56,7 @@ def run_experiments(num_runs=10, base_seed=0, use_grid_map=None):
                 found_count,
                 total_targets,
                 round(discovery_rate, 4),
+                sim.num_false_negatives,
                 sim.frames,
                 round(sim.uav.distance_traveled, 2),
                 int(sim.use_grid_map),

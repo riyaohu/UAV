@@ -88,7 +88,17 @@ USE_GRID_MAP = True
 MAP_WIDTH = 1000
 MAP_HEIGHT = 800
 CELL_SIZE = 20
-OBSTACLE_DENSITY = 0.05
+OBSTACLE_DENSITY = 0.02
 BORDER_BLOCKED = False
 
+# Observation / Sensor settings (Step 7)
+P_FALSE_NEGATIVE = 0.3      # 漏检概率：在范围内也可能看不见
+P_FALSE_POSITIVE = 0.0   # 误检概率：随机冒出假目标
+DISTANCE_NOISE_STD = 0.0    # 测距噪声标准差（像素）
+SHOW_FALSE_POSITIVES = False   # 是否在demo里显示误检红点
+FALSE_POSITIVE_TTL = 30       # 红点显示多少帧
 
+# Step 7B: height-related sensing parameters
+UAV_HEIGHT = 2.0           # 默认飞行高度（抽象单位）
+HEIGHT_REF = 1.0           # 参考高度
+HEIGHT_FN_ALPHA = 0.5      # 高度对漏检率的影响强度

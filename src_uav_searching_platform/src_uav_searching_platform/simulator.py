@@ -11,6 +11,7 @@ from .uav import UAV
 from .target import Target
 from .algorithms import RandomSearch
 from .environment.grid_map import GridMap
+from .observation.observation_model import ObservationModel
 
 
 
@@ -75,9 +76,18 @@ class Simulator:
         # UAV 初始点：如果是栅格地图，尽量落在free cell上（避免一开始就在障碍里）
         if self.grid_map is not None:
             start_x, start_y = self.grid_map.random_free_position()
-            self.uav = UAV(start_x, start_y)
+            self.uav = UAV(start_x, start_y, height=config.UAV_HEIGHT)
+
         else:
             self.uav = UAV(config.UAV_START_X, config.UAV_START_Y)
+
+        # ========== Observation model (Step 7) ==========
+        self.observer = ObservationModel(
+            p_false_negative=getattr(config, "P_FALSE_NEGATIVE", 0.0),
+            p_false_positive=getattr(config, "P_FALSE_POSITIVE", 0.0),
+            distance_noise_std=getattr(config, "DISTANCE_NOISE_STD", 0.0),
+        )
+        self.last_false_positive = None  # 记录最近一次误检点（可选）
 
         # ========== Create targets ==========
         self.targets = []
@@ -96,6 +106,14 @@ class Simulator:
 
         # Statistics
         self.frames = 0
+
+        # Step 7 stats
+        self.num_false_negatives = 0
+        self.num_false_positives = 0
+
+        # Step 7 visualization (false positive TTL)
+        self.fp_pos = None
+        self.fp_ttl = 0
 
     def handle_events(self):
         """Handle user input events"""
@@ -130,11 +148,46 @@ class Simulator:
 
         self.uav.set_position(next_x, next_y)
 
-        # Check if target is detected
-        # 逐个检测目标
+        # ===== Step 7: Observation-based detection (noisy / FN / FP) =====
+
+        # 逐个检测目标：使用 observer，而不是完美检测
+        # ===== Step 7: Observation-based detection + counters =====
+
+        # 逐个检测目标：用观测模型（带漏检/噪声）
         for t in self.targets:
-            if t.is_detected(self.uav.x, self.uav.y, self.uav.detection_radius):
-                print(f"Found one target at ({t.x}, {t.y})! Now: {self.get_found_count()}/{len(self.targets)}")
+            if t.found:
+                continue
+
+            obs = self.observer.observe_target(
+                uav_x=self.uav.x, uav_y=self.uav.y,uav_height=self.uav.height,
+                target_x=t.x, target_y=t.y,
+                detection_radius=self.uav.detection_radius
+            )
+
+            if obs["detected"]:
+                t.found = True
+                print(
+                    f"Detected target at ({t.x}, {t.y})! "
+                    f"true_d={obs['true_distance']:.1f}, noisy_d={obs['noisy_distance']:.1f}. "
+                    f"Now: {self.get_found_count()}/{len(self.targets)}"
+                )
+            else:
+                # “漏检”计数：真实距离在半径内，但没检测到
+                if obs["true_distance"] <= self.uav.detection_radius:
+                    self.num_false_negatives += 1
+
+        # ===== Step 7: False positive + TTL (for visualization) =====
+        fp = self.observer.maybe_false_positive(self.map_width, self.map_height)
+        if fp is not None:
+            self.num_false_positives += 1
+            self.fp_pos = fp["pos"]
+            self.fp_ttl = getattr(config, "FALSE_POSITIVE_TTL", 30)
+        else:
+            # 没产生新的误检时，让旧红点慢慢“过期”
+            if self.fp_ttl > 0:
+                self.fp_ttl -= 1
+                if self.fp_ttl == 0:
+                    self.fp_pos = None
 
         # 是否全部找到
         if config.STOP_WHEN_ALL_FOUND:
@@ -178,6 +231,12 @@ class Simulator:
                         )
                         pygame.draw.rect(self.screen, config.COLOR_DARK_GRAY, rect)
                         pygame.draw.rect(self.screen, config.COLOR_BLACK, rect, width=1)
+
+        # Step 7: draw false positive point (optional)
+        if getattr(config, "SHOW_FALSE_POSITIVES", True):
+            if self.fp_pos is not None and self.fp_ttl > 0:
+                x, y = self.fp_pos
+                pygame.draw.circle(self.screen, config.COLOR_RED, (int(x), int(y)), 6)
 
         # Draw target (only if not found, or with highlight if found)
         for t in self.targets:
@@ -263,6 +322,11 @@ class Simulator:
         self.stop_reason = None
         self.frames = 0
         print("Simulation reset")
+        # Step 7: reset sensor stats & fp visualization
+        self.num_false_negatives = 0
+        self.num_false_positives = 0
+        self.fp_pos = None
+        self.fp_ttl = 0
 
     def run(self):
         """Main simulation loop"""
