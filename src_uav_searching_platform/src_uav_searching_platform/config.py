@@ -102,3 +102,9 @@ FALSE_POSITIVE_TTL = 30       # 红点显示多少帧
 UAV_HEIGHT = 2.0           # 默认飞行高度（抽象单位）
 HEIGHT_REF = 1.0           # 参考高度
 HEIGHT_FN_ALPHA = 0.5      # 高度对漏检率的影响强度
+# 8
+SHOW_BELIEF = True    # 置信栅格画出来且use_grid_map=True
+BELIEF_NEGATIVE_DECAY = 0.7  # 0.3~0.9都可以试
+BELIEF_ALPHA = 100           # 0~255，透明度
+BELIEF_GAMMA = 0.2
+

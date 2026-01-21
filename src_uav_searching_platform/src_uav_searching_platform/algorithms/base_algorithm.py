@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 
 class BaseAlgorithm(ABC):
     """Base class for all search algorithms"""
-
+    uses_belief = False  # 默认：不需要 belief
     def __init__(self, map_width, map_height):
         """
         Initialize the algorithm
@@ -47,3 +47,5 @@ class BaseAlgorithm(ABC):
             str: Algorithm name
         """
         return self.name
+
+

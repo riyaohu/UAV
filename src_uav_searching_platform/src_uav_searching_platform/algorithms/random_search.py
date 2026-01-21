@@ -9,6 +9,7 @@ from .. import config
 
 class RandomSearch(BaseAlgorithm):
     """Random search algorithm with smooth movement"""
+    uses_belief = False
 
     def __init__(self, map_width, map_height):
         """
@@ -85,3 +86,5 @@ class RandomSearch(BaseAlgorithm):
     def reset(self):
         """Reset algorithm state"""
         self.current_direction = random.uniform(0, 360)
+
+

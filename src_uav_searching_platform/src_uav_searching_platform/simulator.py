@@ -12,6 +12,7 @@ from .target import Target
 from .algorithms import RandomSearch
 from .environment.grid_map import GridMap
 from .observation.observation_model import ObservationModel
+from .belief.grid_belief import GridBelief
 
 
 
@@ -81,6 +82,7 @@ class Simulator:
         else:
             self.uav = UAV(config.UAV_START_X, config.UAV_START_Y)
 
+
         # ========== Observation model (Step 7) ==========
         self.observer = ObservationModel(
             p_false_negative=getattr(config, "P_FALSE_NEGATIVE", 0.0),
@@ -97,6 +99,12 @@ class Simulator:
 
         # ========== Initialize algorithm ==========
         self.algorithm = RandomSearch(self.map_width, self.map_height)
+        # 由算法声明决定是否启用 belief（RandomSearch 默认为 False）
+        self.enable_belief = getattr(self.algorithm, "uses_belief", False)
+        # 只有在使用栅格地图 且 算法需要 belief 时，才创建 belief（避免 runner 变慢）
+        self.belief = None
+        if self.grid_map is not None and self.enable_belief:
+            self.belief = GridBelief(self.grid_map)
 
         # Simulation state
         self.running = True
@@ -153,6 +161,8 @@ class Simulator:
         # 逐个检测目标：使用 observer，而不是完美检测
         # ===== Step 7: Observation-based detection + counters =====
 
+        detected_any = False
+
         # 逐个检测目标：用观测模型（带漏检/噪声）
         for t in self.targets:
             if t.found:
@@ -166,6 +176,10 @@ class Simulator:
 
             if obs["detected"]:
                 t.found = True
+                detected_any = True
+                if self.enable_belief and self.belief is not None:
+                    self.belief.mark_found(t.x, t.y)
+
                 print(
                     f"Detected target at ({t.x}, {t.y})! "
                     f"true_d={obs['true_distance']:.1f}, noisy_d={obs['noisy_distance']:.1f}. "
@@ -175,6 +189,10 @@ class Simulator:
                 # “漏检”计数：真实距离在半径内，但没检测到
                 if obs["true_distance"] <= self.uav.detection_radius:
                     self.num_false_negatives += 1
+
+        if self.enable_belief and (not detected_any) and (self.belief is not None):
+            decay = getattr(config, "BELIEF_NEGATIVE_DECAY", 0.5)
+            self.belief.update_negative(self.uav.x, self.uav.y, self.uav.detection_radius, decay=decay)
 
         # ===== Step 7: False positive + TTL (for visualization) =====
         fp = self.observer.maybe_false_positive(self.map_width, self.map_height)
@@ -229,8 +247,50 @@ class Simulator:
                             self.grid_map.cell_size,
                             self.grid_map.cell_size
                         )
-                        pygame.draw.rect(self.screen, config.COLOR_DARK_GRAY, rect)
+                        pygame.draw.rect(self.screen, config.COLOR_YELLOW, rect)
                         pygame.draw.rect(self.screen, config.COLOR_BLACK, rect, width=1)
+
+        if self.enable_belief and getattr(config, "SHOW_BELIEF",
+                                          False) and self.belief is not None and self.grid_map is not None:
+
+            alpha = getattr(config, "BELIEF_ALPHA", 180)  # 你可以先用 220 更明显
+
+            # 1) 找最大概率用于归一化显示
+            max_p = 0.0
+            for r in range(self.grid_map.rows):
+                for c in range(self.grid_map.cols):
+                    if self.grid_map.grid[r][c] == 0:
+                        p = self.belief.belief[r][c]
+                        if p > max_p:
+                            max_p = p
+
+            if max_p > 1e-12:
+                for r in range(self.grid_map.rows):
+                    for c in range(self.grid_map.cols):
+                        if self.grid_map.grid[r][c] == 1:
+                            continue
+
+                        # 2) 归一化到 0~1
+                        p = self.belief.belief[r][c] / max_p
+
+                        # 3) 用 gamma 提升对比度：让“高概率”更红
+                        gamma = getattr(config, "BELIEF_GAMMA", 0.35)  # 越小越显眼
+                        intensity = p ** gamma  # 0~1
+
+                        # 4) 颜色映射：红色强=概率高；透明度固定
+                        red = int(255 * intensity)
+                        green = int(40 * (1 - intensity))  # 少量绿，让颜色更“热”
+                        blue = int(40 * (1 - intensity))
+
+                        rect = pygame.Rect(
+                            c * self.grid_map.cell_size,
+                            r * self.grid_map.cell_size,
+                            self.grid_map.cell_size,
+                            self.grid_map.cell_size
+                        )
+                        s = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+                        s.fill((255, 0, 0, int(alpha * intensity)))  # 关键：透明度也随概率变化
+                        self.screen.blit(s, rect.topleft)
 
         # Step 7: draw false positive point (optional)
         if getattr(config, "SHOW_FALSE_POSITIVES", True):
@@ -327,6 +387,8 @@ class Simulator:
         self.num_false_positives = 0
         self.fp_pos = None
         self.fp_ttl = 0
+        if self.belief is not None:
+            self.belief.reset()
 
     def run(self):
         """Main simulation loop"""
