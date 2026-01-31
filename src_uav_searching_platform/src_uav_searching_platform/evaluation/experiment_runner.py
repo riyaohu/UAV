@@ -15,13 +15,14 @@ RESULT_FILE = os.path.join(RESULT_DIR, f"results_{datetime.now().strftime('%Y%m%
 
 
 
-def run_experiments(num_runs=10, base_seed=0, use_grid_map=None):
+def run_experiments(num_runs=10, base_seed=0, use_grid_map=None, algorithm_name="random"):
+
     os.makedirs(RESULT_DIR, exist_ok=True)
 
     with open(RESULT_FILE, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(
-            ["run_id", "found_all", "found_count", "total_targets", "discovery_rate", "num_false_negatives","frames", "distance", "use_grid_map","map_width", "map_height", "cell_size", "obstacle_density", "seed",
+            ["run_id", "algorithm","found_all", "found_count", "total_targets", "discovery_rate", "num_false_negatives","frames", "distance", "use_grid_map","map_width", "map_height", "cell_size", "obstacle_density", "seed",
              "stop_reason"])
 
         successes = 0
@@ -31,7 +32,7 @@ def run_experiments(num_runs=10, base_seed=0, use_grid_map=None):
             seed = base_seed + i
             set_seed(seed)
 
-            sim = Simulator(render=False, mode="experiment", use_grid_map=use_grid_map)
+            sim = Simulator(render=False, mode="experiment", use_grid_map=use_grid_map, algorithm_name=algorithm_name)
             sim.run()
 
             if sim.target_found:
@@ -52,6 +53,7 @@ def run_experiments(num_runs=10, base_seed=0, use_grid_map=None):
 
             writer.writerow([
                 i,
+                algorithm_name,
                 int(sim.target_found),
                 found_count,
                 total_targets,
@@ -75,4 +77,6 @@ def run_experiments(num_runs=10, base_seed=0, use_grid_map=None):
 
 
 if __name__ == "__main__":
-    run_experiments(num_runs=30, base_seed=200,use_grid_map=True)
+    run_experiments(num_runs=10, base_seed=200, use_grid_map=True, algorithm_name="information_gain")
+    #information_gain
+

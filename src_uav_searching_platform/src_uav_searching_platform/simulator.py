@@ -9,7 +9,7 @@ from . import config
 from .map_manager import MapManager
 from .uav import UAV
 from .target import Target
-from .algorithms import RandomSearch
+from .algorithms import RandomSearch, CoverageSearch, FrontierSearch, InformationGainSearch
 from .environment.grid_map import GridMap
 from .observation.observation_model import ObservationModel
 from .belief.grid_belief import GridBelief
@@ -19,7 +19,8 @@ from .belief.grid_belief import GridBelief
 class Simulator:
     """Main simulator class that manages the simulation"""
 
-    def __init__(self,render=True, mode="experiment", use_grid_map=None):
+    def __init__(self, render=True, mode="experiment", use_grid_map=None, algorithm_name=None):
+
         """Initialize the simulator"""
         # use_grid_map 参数优先；如果没传（None），才使用 config 默认值
         if use_grid_map is None:
@@ -74,14 +75,41 @@ class Simulator:
             self.map_manager = MapManager()
 
         # ========== Create UAV ==========
+        # NOTE: UAV start position is randomized but controlled by experiment seed
+        #       This ensures fair comparison across algorithms
         # UAV 初始点：如果是栅格地图，尽量落在free cell上（避免一开始就在障碍里）
+        # ========== Create UAV ==========
+        # algorithm_name 先规范化（这里不会改变你后面选择算法的逻辑）
+        if algorithm_name is None:
+            algorithm_name = getattr(config, "DEFAULT_ALGORITHM", "random")
+
+        # UAV 初始点：栅格地图下，按算法选择起点策略
         if self.grid_map is not None:
-            start_x, start_y = self.grid_map.random_free_position()
+            # Coverage：从顶部“带状区域”里找一个 free 的起点，避免漏扫上半区
+            if algorithm_name == "coverage":
+                top_band = getattr(config, "COVERAGE_START_TOP_BAND_PX", self.grid_map.cell_size * 2)
+                best = None
+                best_y = 1e18
+
+                # 多次采样：优先找到 y 很小(靠近顶部)的 free 点
+                for _ in range(200):
+                    x, y = self.grid_map.random_free_position()
+                    if y < best_y:
+                        best_y = y
+                        best = (x, y)
+                    if y <= top_band:
+                        best = (x, y)
+                        break
+
+                start_x, start_y = best
+            else:
+                # Random / Frontier：保持原来的随机 free 起点
+                start_x, start_y = self.grid_map.random_free_position()
+
             self.uav = UAV(start_x, start_y, height=config.UAV_HEIGHT)
 
         else:
             self.uav = UAV(config.UAV_START_X, config.UAV_START_Y)
-
 
         # ========== Observation model (Step 7) ==========
         self.observer = ObservationModel(
@@ -98,7 +126,57 @@ class Simulator:
             self.targets.append(Target(x, y))
 
         # ========== Initialize algorithm ==========
-        self.algorithm = RandomSearch(self.map_width, self.map_height)
+        if algorithm_name is None:
+            algorithm_name = getattr(config, "DEFAULT_ALGORITHM", "random")
+
+        if algorithm_name == "coverage":
+            step = getattr(config, "COVERAGE_STEP", 20)
+
+            # 新增：扫描线间距，默认按探测半径来
+            lane_spacing = getattr(config, "COVERAGE_LANE_SPACING", int(self.uav.detection_radius * 2 * 0.9))
+
+            self.algorithm = CoverageSearch(self.map_width, self.map_height, step=step, lane_spacing=lane_spacing)
+
+
+        elif algorithm_name == "frontier":
+
+            self.algorithm = FrontierSearch(
+                map_width=self.map_width,
+                map_height=self.map_height,
+                speed=config.UAV_SPEED,
+                gain_radius_cells=4,
+                lambda_cost=0.002
+            )
+
+
+        elif algorithm_name == "information_gain":
+
+            self.algorithm = InformationGainSearch(
+
+                map_width=self.map_width,
+
+                map_height=self.map_height,
+
+                speed=config.UAV_SPEED,
+
+                num_directions=16,
+
+                lambda_turn=0.8,
+
+                switch_margin=0.08,
+
+                hold_steps_max=10,
+
+                lambda_boundary=2.0
+
+            )
+
+
+
+
+        else:
+            self.algorithm = RandomSearch(self.map_width, self.map_height)
+
         # 由算法声明决定是否启用 belief（RandomSearch 默认为 False）
         self.enable_belief = getattr(self.algorithm, "uses_belief", False)
         # 只有在使用栅格地图 且 算法需要 belief 时，才创建 belief（避免 runner 变慢）
@@ -144,17 +222,39 @@ class Simulator:
         # Get next position from algorithm
         current_x, current_y = self.uav.get_position()
         next_x, next_y = self.algorithm.get_next_position(
-            current_x, current_y, self.uav.angle
+            current_x, current_y, self.uav.angle,
+            grid_map=self.grid_map,
+            belief=self.belief,
+            detection_radius=self.uav.detection_radius
         )
+
+        # --- Step: enforce max step length (avoid teleport) ---
+        dx = next_x - current_x
+        dy = next_y - current_y
+        step = (dx * dx + dy * dy) ** 0.5
+        max_step = self.uav.speed  # config.UAV_SPEED
+
+        if step > max_step and step > 1e-9:
+            scale = max_step / step
+            next_x = current_x + dx * scale
+            next_y = current_y + dy * scale
 
         # Update UAV position with obstacle check
         if self.grid_map is not None and self.grid_map.is_blocked_px(next_x, next_y):
+
             # 撞到障碍：最简单处理——原地不动
             # （为了避免一直卡住，可以让随机搜索重置一下方向）
-            self.algorithm.reset()
+            # 对随机类算法：reset 可以帮助脱困
+            if isinstance(self.algorithm, RandomSearch):
+                self.algorithm.reset()
+
+            # 所有算法：撞障碍就原地不动（由算法自己决定下一步怎么绕）
             next_x, next_y = self.uav.get_position()
 
         self.uav.set_position(next_x, next_y)
+        # --- mark explored area for frontier search ---
+        if self.enable_belief and self.belief is not None:
+            self.belief.mark_explored_in_radius(self.uav.x, self.uav.y, self.uav.detection_radius)
 
         # ===== Step 7: Observation-based detection (noisy / FN / FP) =====
 
@@ -324,6 +424,7 @@ class Simulator:
             f"Distance: {self.uav.distance_traveled:.1f} px",
             f"Position: ({int(self.uav.x)}, {int(self.uav.y)})",
             f"Found: {found_count}/{len(self.targets)}",
+            f"False Negatives: {self.num_false_negatives}",
             f"Status: {'ALL FOUND!' if self.target_found else 'Searching...'}"
         ]
 

@@ -67,7 +67,7 @@ MAX_DISTANCE = 20000.0    # 最大允许飞行距离（可选）
 STOP_WHEN_ALL_FOUND = True
 
 # 复现性
-DEFAULT_SEED = 202  # 用于 demo/main 的固定随机种子
+DEFAULT_SEED = 200 # 用于 demo/main 的固定随机种子
 
 # 多目标
 # 多目标配置（第5步）
@@ -107,4 +107,7 @@ SHOW_BELIEF = True    # 置信栅格画出来且use_grid_map=True
 BELIEF_NEGATIVE_DECAY = 0.7  # 0.3~0.9都可以试
 BELIEF_ALPHA = 100           # 0~255，透明度
 BELIEF_GAMMA = 0.2
+#
+DEFAULT_ALGORITHM = "random"   # "random" 或 "coverage"
+COVERAGE_STEP = 20            # 覆盖算法每步移动像素
 

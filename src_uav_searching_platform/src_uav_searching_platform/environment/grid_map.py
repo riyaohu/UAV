@@ -48,3 +48,9 @@ class GridMap:
                 x = (c + 0.5) * self.cell_size
                 y = (r + 0.5) * self.cell_size
                 return x, y
+
+    def cell_center_px(self, r, c):
+        # 返回格子 (r,c) 的中心点像素坐标
+        x = (c + 0.5) * self.cell_size
+        y = (r + 0.5) * self.cell_size
+        return x, y

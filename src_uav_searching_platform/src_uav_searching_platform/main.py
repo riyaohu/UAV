@@ -9,7 +9,8 @@ def main():
     """Main function"""
     set_seed(config.DEFAULT_SEED)
     # Create and run simulator
-    simulator = Simulator(render=True, mode="demo", use_grid_map=True  )
+    simulator = Simulator(render=True, mode="demo", use_grid_map=True, algorithm_name="coverage")
+
     simulator.run()
 
 
