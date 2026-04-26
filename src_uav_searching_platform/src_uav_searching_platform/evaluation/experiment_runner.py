@@ -5,7 +5,7 @@ from .. import config
 from ..simulator import Simulator
 from datetime import datetime
 from ..utils.seed import set_seed
-
+from ..evaluation.metrics import compute_metrics
 # 终端运行python -m src_uav_searching_platform.evaluation.experiment_runner
 # 在E:\Graduation project\src_uav_searching_platform>下运
 
@@ -73,10 +73,31 @@ def run_experiments(num_runs=10, base_seed=0, use_grid_map=None, algorithm_name=
         writer.writerow([])
         writer.writerow(["SUMMARY", "success_rate", successes / num_runs, "avg_discovery_rate",
                          round(sum_discovery_rate / num_runs, 4)])
-
+        return RESULT_FILE
 
 
 if __name__ == "__main__":
-    run_experiments(num_runs=10, base_seed=200, use_grid_map=True, algorithm_name="information_gain")
-    #information_gain
 
+    algorithms = ["random", "coverage", "frontier", "information_gain"]
+
+    all_results = {}
+
+    for algo in algorithms:
+        print(f"\n===== Running {algo} =====")
+
+        output_file = run_experiments(
+            num_runs=10,
+            base_seed=200,
+            use_grid_map=True,
+            algorithm_name=algo
+        )
+
+        metrics = compute_metrics(output_file)
+        all_results[algo] = metrics
+
+    # ✅ 最终对比输出
+    print("\n\n===== FINAL COMPARISON =====")
+    print(f"{'Algorithm':<20}{'Success':<10}{'Frames':<12}{'Distance':<12}")
+
+    for algo, m in all_results.items():
+        print(f"{algo:<20}{m['success_rate']:<10.2f}{m['avg_frames']:<12.1f}{m['avg_distance']:<12.1f}")

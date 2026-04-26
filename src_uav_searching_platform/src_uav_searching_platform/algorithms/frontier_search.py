@@ -8,7 +8,7 @@ class FrontierSearch(BaseAlgorithm):
     def __init__(self, map_width, map_height, speed=3.0, gain_radius_cells=4, lambda_cost=0.002):
         super().__init__(map_width, map_height)
         self.speed = speed
-
+        self.name = "Frontier Search"
         # --- [B] parameters ---
         self.gain_radius_cells = gain_radius_cells  # 计算“附近信息量”的半径（格子）
         self.lambda_cost = lambda_cost  # 距离代价权重（越大越偏向近）

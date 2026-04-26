@@ -82,7 +82,13 @@ class Simulator:
         # algorithm_name 先规范化（这里不会改变你后面选择算法的逻辑）
         if algorithm_name is None:
             algorithm_name = getattr(config, "DEFAULT_ALGORITHM", "random")
-
+        # ===== 不同算法使用不同终止条件（方案B）=====
+        if algorithm_name == "coverage":
+            self.max_frames = getattr(config, "COVERAGE_MAX_FRAMES", 1000000)
+            self.max_distance = getattr(config, "COVERAGE_MAX_DISTANCE", 100000.0)
+        else:
+            self.max_frames = config.MAX_FRAMES
+            self.max_distance = config.MAX_DISTANCE
         # UAV 初始点：栅格地图下，按算法选择起点策略
         if self.grid_map is not None:
             # Coverage：从顶部“带状区域”里找一个 free 的起点，避免漏扫上半区
@@ -539,10 +545,10 @@ class Simulator:
         if self.target_found:
             return True, "success"
 
-        if self.frames >= config.MAX_FRAMES:
+        if self.frames >= self.max_frames:
             return True, "timeout"
 
-        if self.uav.distance_traveled >= config.MAX_DISTANCE:
+        if self.uav.distance_traveled >= self.max_distance:
             return True, "distance_limit"
 
         return False, None

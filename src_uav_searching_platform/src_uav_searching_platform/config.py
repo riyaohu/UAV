@@ -65,7 +65,9 @@ INFO_BG_COLOR = (255, 255, 255, 200)  # white with transparency
 MAX_FRAMES = 5000          # 最大允许运行帧数
 MAX_DISTANCE = 20000.0    # 最大允许飞行距离（可选）
 STOP_WHEN_ALL_FOUND = True
-
+# Coverage 专用
+COVERAGE_MAX_FRAMES = 15000
+COVERAGE_MAX_DISTANCE = 50000.0
 # 复现性
 DEFAULT_SEED = 200 # 用于 demo/main 的固定随机种子
 
