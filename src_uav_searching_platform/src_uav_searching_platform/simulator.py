@@ -13,14 +13,15 @@ from .algorithms import RandomSearch, CoverageSearch, FrontierSearch, Informatio
 from .environment.grid_map import GridMap
 from .observation.observation_model import ObservationModel
 from .belief.grid_belief import GridBelief
-
+import os
+from .baseline_template_matching_cruise import config_template_matching as tm_cfg
+from .baseline_template_matching_cruise.template_matching_cruise import TemplateMatchingCruise
 
 
 class Simulator:
     """Main simulator class that manages the simulation"""
 
-    def __init__(self, render=True, mode="experiment", use_grid_map=None, algorithm_name=None):
-
+    def __init__(self, render=True, mode="experiment", use_grid_map=None, algorithm_name=None, start_pos=None):
         """Initialize the simulator"""
         # use_grid_map 参数优先；如果没传（None），才使用 config 默认值
         if use_grid_map is None:
@@ -29,9 +30,17 @@ class Simulator:
             self.use_grid_map = use_grid_map
 
         # Initialize pygame
+        # Initialize pygame
         self.render = render
         self.mode = mode
         self.stop_reason = None
+
+        # TemplateMatching 即使在 render=False 时，也需要 pygame 加载/处理图像
+        if algorithm_name == "template_matching" and not self.render:
+            os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+            pygame.init()
+            pygame.display.set_mode((1, 1))
+
         if self.render:
             pygame.init()
 
@@ -82,40 +91,24 @@ class Simulator:
         # algorithm_name 先规范化（这里不会改变你后面选择算法的逻辑）
         if algorithm_name is None:
             algorithm_name = getattr(config, "DEFAULT_ALGORITHM", "random")
-        # ===== 不同算法使用不同终止条件（方案B）=====
-        if algorithm_name == "coverage":
-            self.max_frames = getattr(config, "COVERAGE_MAX_FRAMES", 1000000)
-            self.max_distance = getattr(config, "COVERAGE_MAX_DISTANCE", 100000.0)
-        else:
-            self.max_frames = config.MAX_FRAMES
-            self.max_distance = config.MAX_DISTANCE
+
+        self.algorithm_name = algorithm_name
+        # ===== 公平实验：所有算法使用相同终止条件 =====
+        self.max_frames = config.MAX_FRAMES
+        self.max_distance = config.MAX_DISTANCE
         # UAV 初始点：栅格地图下，按算法选择起点策略
         if self.grid_map is not None:
-            # Coverage：从顶部“带状区域”里找一个 free 的起点，避免漏扫上半区
-            if algorithm_name == "coverage":
-                top_band = getattr(config, "COVERAGE_START_TOP_BAND_PX", self.grid_map.cell_size * 2)
-                best = None
-                best_y = 1e18
-
-                # 多次采样：优先找到 y 很小(靠近顶部)的 free 点
-                for _ in range(200):
-                    x, y = self.grid_map.random_free_position()
-                    if y < best_y:
-                        best_y = y
-                        best = (x, y)
-                    if y <= top_band:
-                        best = (x, y)
-                        break
-
-                start_x, start_y = best
+            if start_pos is not None:
+                start_x, start_y = start_pos
             else:
-                # Random / Frontier：保持原来的随机 free 起点
                 start_x, start_y = self.grid_map.random_free_position()
 
             self.uav = UAV(start_x, start_y, height=config.UAV_HEIGHT)
-
         else:
             self.uav = UAV(config.UAV_START_X, config.UAV_START_Y)
+
+        self.start_x = self.uav.start_x
+        self.start_y = self.uav.start_y
 
         # ========== Observation model (Step 7) ==========
         self.observer = ObservationModel(
@@ -177,7 +170,22 @@ class Simulator:
 
             )
 
+        elif algorithm_name == "template_matching":
 
+            if self.use_grid_map:
+                raise ValueError("template_matching 只能在图片地图模式下运行，请设置 use_grid_map=False")
+
+            self.algorithm = TemplateMatchingCruise(
+                self.map_width,
+                self.map_height,
+                tm_cfg
+            )
+
+            self.algorithm.reset(
+                self.uav.x,
+                self.uav.y,
+                self.uav.angle
+            )
 
 
         else:
@@ -198,7 +206,8 @@ class Simulator:
 
         # Statistics
         self.frames = 0
-
+        # ===== 新增：逐帧日志 =====
+        self.frame_logs = []
         # Step 7 stats
         self.num_false_negatives = 0
         self.num_false_positives = 0
@@ -220,6 +229,27 @@ class Simulator:
                 elif event.key == pygame.K_r:
                     self.reset()
 
+    def build_template_scene_surface(self):
+        """
+        为 TemplateMatchingCruise 构造图像场景：
+        地图背景 + 目标图像。
+        不画 UAV、不画轨迹、不画信息面板。
+        这样最接近老师原始 comparison_runner 的输入。
+        """
+        if self.map_manager is None:
+            raise ValueError("template_matching 需要图片地图 map_manager")
+
+        surface = self.map_manager.image.copy()
+
+        for t in self.targets:
+            if hasattr(t, "image") and t.image is not None:
+                rect = t.image.get_rect(center=(int(t.x), int(t.y)))
+                surface.blit(t.image, rect)
+            else:
+                pygame.draw.circle(surface, config.COLOR_RED, (int(t.x), int(t.y)), 8)
+
+        return surface
+
     def update(self):
         """Update simulation state"""
         if self.paused or self.search_complete:
@@ -227,12 +257,23 @@ class Simulator:
 
         # Get next position from algorithm
         current_x, current_y = self.uav.get_position()
-        next_x, next_y = self.algorithm.get_next_position(
-            current_x, current_y, self.uav.angle,
-            grid_map=self.grid_map,
-            belief=self.belief,
-            detection_radius=self.uav.detection_radius
-        )
+
+        if isinstance(self.algorithm, TemplateMatchingCruise):
+            scene_surface = self.build_template_scene_surface()
+
+            next_x, next_y = self.algorithm.get_next_position(
+                current_x,
+                current_y,
+                self.uav.angle,
+                scene_surface=scene_surface
+            )
+        else:
+            next_x, next_y = self.algorithm.get_next_position(
+                current_x, current_y, self.uav.angle,
+                grid_map=self.grid_map,
+                belief=self.belief,
+                detection_radius=self.uav.detection_radius
+            )
 
         # --- Step: enforce max step length (avoid teleport) ---
         dx = next_x - current_x
@@ -321,6 +362,16 @@ class Simulator:
                 print(
                     f"All targets found! Time: {self.frames} frames, Distance: {self.uav.distance_traveled:.2f} pixels")
 
+        # ===== 新增：逐帧日志记录 =====
+        self.frame_logs.append({
+            "frame": self.frames,
+            "x": self.uav.x,
+            "y": self.uav.y,
+            "distance": self.uav.distance_traveled,
+            "found_count": self.get_found_count(),
+            "target_found": int(self.target_found),
+        })
+
         self.frames += 1
 
         stop, reason = self.check_termination()
@@ -333,6 +384,38 @@ class Simulator:
 
     def get_found_count(self):
         return sum(1 for t in self.targets if t.found)
+
+    def get_frame_logs(self):
+        return self.frame_logs
+
+    def draw_template_matching_overlay(self):
+        if not isinstance(self.algorithm, TemplateMatchingCruise):
+            return
+
+        info = self.algorithm.get_debug_info()
+
+        roi_rect = info.get("ROI矩形")
+        peak = info.get("峰值坐标")
+
+        # ===== 画 ROI（黄色框）=====
+        if roi_rect is not None:
+            x1, y1, x2, y2 = roi_rect
+            pygame.draw.rect(
+                self.screen,
+                (255, 255, 0),  # 黄色
+                pygame.Rect(x1, y1, x2 - x1, y2 - y1),
+                2
+            )
+
+        # ===== 画匹配点（红点）=====
+        if peak is not None:
+            pygame.draw.circle(
+                self.screen,
+                (255, 0, 0),
+                (int(peak[0]), int(peak[1])),
+                6
+            )
+
 
     def draw(self):
         """Draw all elements on screen"""
@@ -414,7 +497,7 @@ class Simulator:
             show_detection_range=config.SHOW_DETECTION_RANGE,
             show_trajectory=config.SHOW_TRAJECTORY
         )
-
+        self.draw_template_matching_overlay()
         # Draw info panel
         self.draw_info_panel()
 
@@ -481,7 +564,10 @@ class Simulator:
         self.uav.reset()
         for t in self.targets:
             t.reset()
-        self.algorithm.reset()
+        if isinstance(self.algorithm, TemplateMatchingCruise):
+            self.algorithm.reset(self.uav.x, self.uav.y, self.uav.angle)
+        else:
+            self.algorithm.reset()
         self.paused = False
         self.running = True
         self.target_found = False
