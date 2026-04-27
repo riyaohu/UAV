@@ -1,0 +1,6 @@
+algorithm,success_rate,avg_frames,avg_distance
+random,0.8,3915.6,11697.0
+coverage,1.0,4563.6,13690.8
+frontier,1.0,1189.6,3568.8
+information_gain,1.0,1680.4,5031.3
+template_matching,1.0,2364.8,7094.4

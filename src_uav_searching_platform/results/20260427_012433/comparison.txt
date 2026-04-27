@@ -1,0 +1,9 @@
+算法对比统计结果
+====================
+
+Algorithm           Success   Frames      Distance    
+random              0.80      3915.6      11697.0     
+coverage            1.00      4563.6      13690.8     
+frontier            1.00      1189.6      3568.8      
+information_gain    1.00      1680.4      5031.3      
+template_matching   1.00      2364.8      7094.4      

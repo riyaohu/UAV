@@ -1,0 +1,22 @@
+算法对照结论
+====================
+
+按搜索效率（平均帧数）排序：
+1. frontier - 平均帧数: 1189.60
+2. information_gain - 平均帧数: 1680.40
+3. template_matching - 平均帧数: 2364.80
+4. random - 平均帧数: 3915.60
+5. coverage - 平均帧数: 4563.60
+
+最优算法: frontier
+最差算法: coverage
+
+最优算法相对于最差算法的时间改进: 73.93%
+
+成功率分析：
+random: 成功率 0.80
+coverage: 成功率 1.00
+frontier: 成功率 1.00
+information_gain: 成功率 1.00
+template_matching: 成功率 1.00
+

@@ -1,0 +1,8 @@
+run_id,algorithm,found_all,found_count,total_targets,discovery_rate,num_false_negatives,frames,distance,use_grid_map,map_width,map_height,cell_size,obstacle_density,seed,stop_reason
+0,information_gain,1,3,3,1.0,0,1276,3825.3,1,1000,800,20,0.02,200,success
+1,information_gain,1,3,3,1.0,0,1754,5246.7,1,1000,800,20,0.02,201,success
+2,information_gain,1,3,3,1.0,2,2381,7120.5,1,1000,800,20,0.02,202,success
+3,information_gain,1,3,3,1.0,0,1597,4786.5,1,1000,800,20,0.02,203,success
+4,information_gain,1,3,3,1.0,1,1394,4177.5,1,1000,800,20,0.02,204,success
+
+SUMMARY,success_rate,1.0,avg_discovery_rate,1.0
