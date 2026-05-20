@@ -228,7 +228,6 @@ class InformationGainSearch(BaseAlgorithm):
 
         return s * cover_ratio
 
-    # ---------------- movement helpers ----------------
 
     def try_step_with_avoid(self, x, y, angle, grid_map):
         """

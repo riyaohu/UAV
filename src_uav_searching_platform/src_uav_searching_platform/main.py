@@ -9,8 +9,7 @@ def main():
     """Main function"""
     set_seed(config.DEFAULT_SEED)
     # Create and run simulator
-    simulator = Simulator(render=True, mode="demo", use_grid_map=False, algorithm_name="template_matching")
-
+    simulator = Simulator(render=True, mode="demo", use_grid_map=False ,algorithm_name="template_matching")
     simulator.run()
 
 
